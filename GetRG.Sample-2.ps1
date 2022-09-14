@@ -24,16 +24,28 @@ Get-AzSubscription | ForEach-Object {
 }
 
 try {
-    for ($i = 0; $i -lt $allHostPools.Count; ++$i) 
+    for ($i = 0; $i -lt $allHostPools.Count; $i++) 
     {
-        Write-Host $allHostPools[$i]
-        
+        Write-Verbose $allHostPools[$i]
         $sessionHostsName = Get-AzWvdSessionHost -ResourceGroupName $allHostPools[$i].HostPoolRG -HostPoolName $allHostPools[$i].HostPool | Where-Object { $_.AllowNewSession -eq $true }
-        Write-Host $sessionHostsName 
+        Write-Verbose $sessionHostsName
     } 
 }
 catch {
     $ErrorMessage = $_.Exception.message
     Write-Error ("Error getting session hosts details: " + $ErrorMessage)
+    Break
+}
+
+try {
+    for ($i = 0; $i -lt $allHostPools.Count; $i++) {
+        $hostPool = Get-AzWvdHostPool -ResourceGroupName $allHostPools[$i].HostPoolRG -Name $allHostPools[$i].HostPool
+        Write-Verbose "HostPool Name"
+        Write-Verbose $hostPool.Name
+    }
+}
+catch {
+    $ErrorMessage = $_.Exception.message
+    Write-Error ("Error getting host pool details: " + $ErrorMessage)
     Break
 }
