@@ -2,13 +2,20 @@
 #variable_initialization
 
 $VerbosePreference = "Continue"
-#$usePeak = $true
-#$useBreadthFirstDuringPeak = $true
-#$peakServerStartThreshold = 4
 $startPeakTime = '08:00:00'
 $endPeakTime = '18:00:00'
 $timeZone = "Eastern Standard Time"
-#$peakDay = 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'
+
+Get-AzSubscription | ForEach-Object {
+    $subscriptionName = $_.Name
+    Set-AzContext -SubscriptionId $_.SubscriptionId
+    (Get-AzResourceGroup).ResourceGroupName | ForEach-Object {     
+        [PSCustomObject] @{
+            Subscription = $subscriptionName
+            ResourceGroup = $_
+        }
+    }
+}
 
 #Machine_count
 
@@ -28,7 +35,7 @@ $allHostPools = @(
     }
     
 )
-
+Write-Host ($ResourceGroupName | Format-Table | Out-String)
 $ResourceGroupName = $allHostPools.HostPoolRG
 $VmName = $allHostPools.VmName
 $hostPoolName = $allHostPools.HostPool
@@ -94,21 +101,28 @@ catch {
     Write-Verbose "Running Session Host $runningSessionHostsCount"
     Write-Verbose ($runningSessionHosts | Out-string)
 
+Write-Verbose $startPeakTime
+Write-Verbose $endPeakTime
 
 for ($i = 0; $i -lt $vmName.Count; $i++) {
     $Statuses=(Get-AzVM -ResourceGroupName $ResourceGroupName[$i] -Name $VmName[$i] -Status).Statuses
     Write-Verbose $Statuses[1].Code
 
-    if (($Statuses[1].Code -eq "PowerState/Running") && ($endPeakTime -eq $true))
+    if (("$Env:Offpeaktime"[$i] -eq $endPeakTime[$i]) -and ($Statuses[1].Code -eq "PowerState/Running"))
     {
-        Write-Verbose "Condition not met to Start"
-        Write-Verbose "Stopping the Virtual machines"
-        Stop-AzVM -ResourceGroupName $ResourceGroupName[$i] -Name $VmName[$i] -Force
+        for ($i = 0; $i -lt $VmName.Count; $i++) {
+            Write-Verbose "$Env:peaktime"
+            Write-Verbose "Condition not met to Start"
+            Write-Verbose "Stopping the Virtual machines"
+            Stop-AzVM -ResourceGroupName $ResourceGroupName[$i] -Name $VmName[$i] -Force -NoWait
+        }
     }
-    elseif (($Statuses[1].Code -eq "PowerState/deallocated") && ($startPeakTime -eq $true))
+    elseif (("$Env:peaktime"[$i] -eq $startPeakTime[$i]) -and ($Statuses[1].Code -eq "PowerState/deallocated"))
     {
-        Write-Verbose "Condition met to Strat"
-        Write-Verbose "Starting the Virtual machines"
-        Start-AzVM -ResourceGroupName $ResourceGroupName[$i] -Name $VmName[$i]
+        for ($i = 0; $i -lt $VmName.Count; $i++) {
+            Write-Verbose "Condition met to Strat"
+            Write-Verbose "Starting the Virtual machines"
+            Start-AzVM -ResourceGroupName $ResourceGroupName[$i] -Name $VmName[$i] -NoWait
+        }
     }
 }
